@@ -12,8 +12,7 @@ This client accepts the following options:
 
 
 def main():
-    print("TFTPy - Cliente de TFTP")
-    print("(em desenvolvimento)")
+    print("TFTPy - Cliente de TFTP (em desenvolvimento)")
 #:
 
 if __name__ == '__main__':
