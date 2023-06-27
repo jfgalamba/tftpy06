@@ -99,6 +99,11 @@ def unpack_rrq_wrq(opcode: int, packet: bytes) -> tuple[str, str]:
     return (filename, mode)
 #:
 
+# TODO: Fazer funções:
+# 1) pack_dat, unpack_dat
+# 2) pack_ack, unpack_ack
+# 3) pack_err, unpack_err
+
 def unpack_opcode(packet: bytes) -> int:
     opcode = struct.unpack('!H', packet[:2])[0]
     if opcode not in (RRQ, WRQ, DAT, ACK, ERR):
