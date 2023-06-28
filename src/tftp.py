@@ -60,6 +60,81 @@ INET4Address = tuple[str, int]        # TCP/UDP address => IPv4 and port
 
 ###############################################################
 ##
+##      SEND AND RECEIVE FILES
+##
+###############################################################
+
+def get_file(server_addr: INET4Address, filename: str):
+    """
+    Get the remote file given by `filename` through a TFTP RRQ
+    connection to remote server at `server_addr`.
+    """
+    with socket(AF_INET, SOCK_DGRAM) as sock:
+        sock.settimeout(INACTIVITY_TIMEOUT)
+        with open(filename, 'wb') as file:
+            rrq = pack_rrq(filename)
+            next_block_number = 1
+            sock.sendto(rrq, server_addr)
+            while True:
+                packet, server_addr = sock.recvfrom(DEFAULT_BUFFER_SIZE)
+                opcode = unpack_opcode(packet)
+
+                if opcode == DAT:
+                    block_number, data = unpack_dat(packet)
+                    if block_number not in (next_block_number, next_block_number - 1):
+                        raise ProtocolError(f'Unexpected block number: {block_number}')
+
+                    if block_number == next_block_number:
+                        file.write(data)
+                        next_block_number += 1
+
+                    ack = pack_ack(block_number)
+                    sock.sendto(ack, server_addr)
+
+                    if len(data) < 512:
+                        break
+                #:
+                elif opcode == ERR:
+                    error_code, error_msg = unpack_err(packet)
+                    raise Err(error_code, error_msg)
+                #:
+                else:
+                    raise ProtocolError(f'Invalid opcode: {opcode}')
+        #:
+    #:
+#:
+
+# def get_file(server_addr: INET4Address, filename: str):
+    # 1. Criar um socket DGRAM para comunicar com servidor em server_addr
+    # 2. Abrir um ficheiro local com nome 'filename' para escrita binária 
+    # 3. Enviar RRQ para o servidor em server_addr
+    # 4. Esperar por pacote enviado pelo servidor [1]
+    #       4.1 Extrair opcode do pacote recebido
+    #       4.2 Se opcode for DAT:
+    #           a) Obter block_number e data (ie, o bloco de dados) (UNPACK)
+    #           b) Se block_number não for next_block_number ou 
+    #              next_block_number - 1 => ERRO de protocolo [2]
+    #           c) Se block_number == next_block_number [3], gravamos
+    #              bloco de dados no ficheiro e incrementamos next_block_number
+    #           d) Enviar ACK reconhecendo o último pacote recebido
+    #           e) Se bloco de dados < 512, terminar o RRQ
+    #       4.3 Se pacote for ERR: assinalar o erro lançando a excepção apropriada
+    #       4.4 Se for outro tipo de pacote: assinalar ERRO de protocolo
+    #       4.5 Voltar a 4
+    #
+    # [1] Terminar quando dimensão do bloco de dados do pacote 
+    #     DAT for < 512 bytes (ou se ocorrer um erro)
+    # [2] next_block_number indica o próximo block_number. contador
+    #     inicializado a 1 antes do passo 4.
+    # [3] Isto quer dizer que recebemos um novo DAT
+#:
+
+def put_file():
+    pass
+#:
+
+###############################################################
+##
 ##      PACKET PACKING AND UNPACKING
 ##
 ###############################################################
