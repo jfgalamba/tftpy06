@@ -11,11 +11,11 @@ import struct
 import string
 from socket import (
     socket,
+    AF_INET, SOCK_DGRAM,
     herror,
     gaierror,
     gethostbyaddr,
     gethostbyname_ex,
-    AF_INET, SOCK_DGRAM,
 )
 
 ###############################################################
@@ -99,10 +99,54 @@ def unpack_rrq_wrq(opcode: int, packet: bytes) -> tuple[str, str]:
     return (filename, mode)
 #:
 
-# TODO: Fazer funções:
-# 1) pack_dat, unpack_dat
-# 2) pack_ack, unpack_ack
-# 3) pack_err, unpack_err
+def pack_dat(block_number: int, data: bytes) -> bytes:
+    if not 0 <= block_number <= MAX_BLOCK_NUMBER:
+        raise ValueError(f'Invalid block number: {block_number}')
+    if len(data) > MAX_DATA_LEN:
+        raise ValueError(f'Invalid data length: {len(data)}')
+
+    fmt = f'!HH{len(data)}s'
+    return struct.pack(fmt, DAT, block_number, data)
+#:
+
+def unpack_dat(packet: bytes) -> tuple[int, bytes]:
+    opcode, block_number = struct.unpack('!HH', packet[:4])
+    if opcode != DAT:
+        raise ValueError(f'Invalid opcode: {opcode}')
+    return block_number, packet[4:]
+#:
+
+def pack_ack(block_number: int) -> bytes:
+    if not 0 <= block_number <= MAX_BLOCK_NUMBER:
+        raise ValueError(f'Invalid block number: {block_number}')
+    return struct.pack('!HH', ACK, block_number)
+#:
+
+def unpack_ack(packet: bytes) -> int:
+    if len(packet) > 4:
+        raise ValueError(f'Invalid packet length: {len(packet)}')
+    opcode, block_number = struct.unpack('!HH', packet)
+    if opcode != ACK:
+        raise ValueError(f'Invalid opcode: {opcode}')
+    return block_number
+#:
+
+def pack_err(error_code: int, error_msg: str) -> bytes:
+    if error_code not in ERROR_MESSAGES:
+        raise ValueError(f'Unknown error code {error_code}')
+    
+    encoded_error_msg = error_msg.encode() + b'\x00'
+    fmt = f'!HH{len(encoded_error_msg)}s'
+    return struct.pack(fmt, ERR, error_code, encoded_error_msg)
+#:
+
+def unpack_err(packet: bytes) -> tuple[int, str]:
+    fmt = f'!HH{len(packet)-4}s'
+    opcode, error_num, error_msg = struct.unpack(fmt, packet)
+    if opcode != ERR:
+        raise ValueError(f'Invalid opcode: {opcode}')
+    return error_num, error_msg[:-1].decode()
+#:
 
 def unpack_opcode(packet: bytes) -> int:
     opcode = struct.unpack('!H', packet[:2])[0]
